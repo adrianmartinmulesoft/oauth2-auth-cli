@@ -65,18 +65,9 @@ func (o *Oauth2CLI) Authorize() (*oauth2.Token, error) {
 		o.Log.Infof("Waiting for response on: %s", server.URL)
 	} else {
 		server := httptest.NewUnstartedServer(handler)
-		if serveFlag != "" {
-			l, err := net.Listen("tcp", serveFlag)
-			if err != nil {
-				return nil, fmt.Errorf("httptest: failed to listen on %v: %v", serveFlag, err)
-			}
-			return l
-		}
 		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", o.Port))
 		if err != nil {
-			if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-				return nil, fmt.Errorf("httptest: failed to listen on a port: %v", err)
-			}
+			return nil, fmt.Errorf("httptest: failed to listen on a port %d: %v", o.Port, err)
 		}
 
 		server.Listener = l
