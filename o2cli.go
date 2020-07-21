@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/oauth2"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+
 	rndm "github.com/nmrshll/rndm-go"
+	"github.com/sirupsen/logrus"
 	"github.com/skratchdot/open-golang/open"
 )
 
@@ -23,6 +25,7 @@ func Authorize(conf *oauth2.Config) (*oauth2.Token, error) {
 
 type Oauth2CLI struct {
 	Log  *logrus.Logger
+	Port uint
 	Conf *oauth2.Config
 }
 
@@ -50,15 +53,44 @@ func (o *Oauth2CLI) Authorize() (*oauth2.Token, error) {
 		fmt.Fprintf(w, renderSuccess())
 	})
 
-	server := httptest.NewServer(handler)
-	defer server.Close()
+	if o.Port == 0 {
+		server := httptest.NewServer(handler)
+		defer server.Close()
 
-	o.Conf.RedirectURL = fmt.Sprintf("%s%s", server.URL, "/callback")
-	url := o.Conf.AuthCodeURL(state)
+		o.Conf.RedirectURL = fmt.Sprintf("%s%s", server.URL, "/callback")
+		url := o.Conf.AuthCodeURL(state)
 
-	o.Log.Infof("If browser window does not open automatically, open it by clicking on the link:\n %s", url)
-	open.Run(url)
-	o.Log.Infof("Waiting for response on: %s", server.URL)
+		o.Log.Infof("If browser window does not open automatically, open it by clicking on the link:\n %s", url)
+		open.Run(url)
+		o.Log.Infof("Waiting for response on: %s", server.URL)
+	} else {
+		server := httptest.NewUnstartedServer(handler)
+		if serveFlag != "" {
+			l, err := net.Listen("tcp", serveFlag)
+			if err != nil {
+				return nil, fmt.Errorf("httptest: failed to listen on %v: %v", serveFlag, err)
+			}
+			return l
+		}
+		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", o.Port))
+		if err != nil {
+			if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+				return nil, fmt.Errorf("httptest: failed to listen on a port: %v", err)
+			}
+		}
+
+		server.Listener = l
+		server.Start()
+		defer server.Close()
+
+		o.Conf.RedirectURL = fmt.Sprintf("%s%s", server.URL, "/callback")
+		url := o.Conf.AuthCodeURL(state)
+
+		o.Log.Infof("If browser window does not open automatically, open it by clicking on the link:\n %s", url)
+		open.Run(url)
+		o.Log.Infof("Waiting for response on: %s", server.URL)
+
+	}
 
 	select {
 	case err := <-errorC:
