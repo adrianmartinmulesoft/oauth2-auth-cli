@@ -2,6 +2,7 @@
 
 Simple library for command line or other desktop apps that need to auth against OAuth2. Returns a `*oauth2.Token`, but doesn't care to handle refreshes. If you want an authenticated HTTP Client, try https://github.com/nmrshll/oauth2-noserver
 
+Specify an static port with the option.
 
 ## Thanks
 
